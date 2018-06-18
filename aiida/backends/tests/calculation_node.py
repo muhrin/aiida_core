@@ -9,7 +9,7 @@
 ###########################################################################
 
 from aiida.backends.testbase import AiidaTestCase
-from aiida.common.exceptions import ModificationNotAllowed
+from aiida.common.exceptions import ModificationNotAllowed, LockError
 from aiida.orm.calculation import Calculation
 
 
@@ -94,3 +94,17 @@ class TestCalcNode(AiidaTestCase):
 
         with self.assertRaises(ModificationNotAllowed):
             a._del_attr(Calculation.PROCESS_STATE_KEY)
+
+
+class TestCalcNodeLock(AiidaTestCase):
+    """
+    Test that locking a calculation node works correctly
+    """
+
+    def test_try_relock(self):
+        calc = Calculation()
+        calc.store()
+        with calc.lock():
+            with self.assertRaises(LockError):
+                with calc.lock():
+                    pass

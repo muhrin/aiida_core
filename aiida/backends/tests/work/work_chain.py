@@ -117,7 +117,6 @@ class Wf(work.WorkChain):
 
 
 class PotentialFailureWorkChain(WorkChain):
-
     EXIT_STATUS = 1
     EXIT_MESSAGE = 'Well you did ask for it'
 
@@ -295,12 +294,10 @@ class TestWorkchain(AiidaTestCase):
         class ReturnA(work.Process):
             def _run(self):
                 self.out('res', A)
-                return
 
         class ReturnB(work.Process):
             def _run(self):
                 self.out('res', B)
-                return
 
         class Wf(WorkChain):
             @classmethod
@@ -603,6 +600,7 @@ class TestWorkchain(AiidaTestCase):
         proc = run_and_check_success(wf_class, **inputs)
         return proc.finished_steps
 
+
 class TestWorkchainWithOldWorkflows(AiidaTestCase):
     def setUp(self):
         super(TestWorkchainWithOldWorkflows, self).setUp()
@@ -818,8 +816,6 @@ class TestWorkChainAbortChildren(AiidaTestCase):
         self.assertEquals(process.calc.is_killed, True)
 
 
-#
-
 class TestImmutableInputWorkchain(AiidaTestCase):
     """
     Test that inputs cannot be modified
@@ -925,10 +921,12 @@ class SerializeWorkChain(WorkChain):
         assert isinstance(self.inputs.test, Str)
         assert self.inputs.test == self.inputs.reference
 
+
 class TestSerializeWorkChain(AiidaTestCase):
     """
     Test workchains with serialized input / output.
     """
+
     def setUp(self):
         super(TestSerializeWorkChain, self).setUp()
         self.assertIsNone(Process.current())
@@ -1137,7 +1135,6 @@ class TestWorkChainExpose(AiidaTestCase):
 
 
 class TestWorkChainReturnDict(AiidaTestCase):
-
     class PointlessWorkChain(WorkChain):
 
         @classmethod
@@ -1205,4 +1202,5 @@ class TestDefaultUniqueness(AiidaTestCase):
         # Trying to load one of the inputs through the UUID should fail,
         # as both `child_one.a` and `child_two.a` should have the same UUID.
         node = load_node(uuid=node.get_inputs_dict()['child_one_a'].uuid)
-        self.assertEquals(len(uuids), len(nodes), 'Only {} unique UUIDS for {} input nodes'.format(len(uuids), len(nodes)))
+        self.assertEquals(len(uuids), len(nodes),
+                          'Only {} unique UUIDS for {} input nodes'.format(len(uuids), len(nodes)))

@@ -7,7 +7,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-
+import abc
 import collections
 import enum
 import logging
@@ -103,11 +103,11 @@ class AbstractCalculation(Sealable):
 
         # extend it for calculation
         schema["attributes.state"] = {
-                "display_name": "State",
-                "help_text": "AiiDA state of the calculation",
-                "is_foreign_key": False,
-                "type": ""
-            }
+            "display_name": "State",
+            "help_text": "AiiDA state of the calculation",
+            "is_foreign_key": False,
+            "type": ""
+        }
         return schema
 
     @property
@@ -469,6 +469,10 @@ class AbstractCalculation(Sealable):
         else:
             return None
 
+    @abc.abstractmethod
+    def lock(self):
+        pass
+
     def get_linkname(self, link, *args, **kwargs):
         """
         Return the linkname used for a given input link
@@ -540,7 +544,7 @@ class AbstractCalculation(Sealable):
         else:
             raise ValueError('Calculation cannot have links of type {} as input'.format(link_type))
 
-        return super(AbstractCalculation, self).add_link_from( src, label, link_type)
+        return super(AbstractCalculation, self).add_link_from(src, label, link_type)
 
     def get_code(self):
         """

@@ -253,3 +253,10 @@ class DanglingLinkError(Exception):
     Raised when an export archive is detected to contain dangling links when importing
     """
     pass
+
+
+class LockError(AiidaException):
+    """
+    Raised when the user tried to lock a node that is currently locked
+    """
+    pass

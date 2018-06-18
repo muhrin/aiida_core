@@ -248,3 +248,10 @@ class TestFunctionProcess(AiidaTestCase):
         function_process_class = work.FunctionProcess.build(wf_fixed_args)
         outs = work.launch.run(function_process_class, **inputs)
         self.assertEqual(outs, inputs)
+
+
+class TestCalcNodeLocking(AiidaTestCase):
+    """
+    Test that the locking mechanism used by Processes on calculation nodes is working
+    """
+    pass

@@ -15,6 +15,7 @@ import inspect
 import itertools
 import plumpy
 import uuid
+import tornado.gen
 import traceback
 from pika.exceptions import ConnectionClosed
 
@@ -205,12 +206,19 @@ class Process(plumpy.Process):
 
     # region Process messages
     @override
-    def on_entering(self, state):
-        super(Process, self).on_entering(state)
-        # Update the node attributes every time we enter a new state
+    def on_exiting(self):
+        super(Process, self).on_exiting()
+        self._checkpoint()
 
     def on_entered(self, from_state):
         super(Process, self).on_entered(from_state)
+        if self._state.is_terminal():
+            self._checkpoint()
+
+    def _checkpoint(self):
+        """
+        Checkpoint the calculation, update the node and save the persisted state.
+        """
         self.update_node_state(self._state)
         if self._enable_persistence and not self._state.is_terminal():
             try:
@@ -396,6 +404,12 @@ class Process(plumpy.Process):
 
             if utils.is_work_calc_type(self.calc):
                 value.add_link_from(self.calc, label, LinkType.RETURN)
+
+    @tornado.gen.coroutine
+    def step(self):
+        with self.calc.lock():
+            result = yield super(Process, self).step()
+            raise tornado.gen.Return(result)
 
     def _setup_db_record(self):
         assert self.inputs is not None
