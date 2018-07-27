@@ -407,9 +407,15 @@ class Process(plumpy.Process):
 
     @tornado.gen.coroutine
     def step(self):
+        """Execute the next step in the Process."""
+
         with self.calc.lock():
+            # Within the lock context manager, only this Process can now alter the Node state
             result = yield super(Process, self).step()
-            raise tornado.gen.Return(result)
+
+        # Imporant to raise the Return *outside* of the lock context manager, because otherwise the raise may be
+        # caught by the ORM layer, triggering a rollback
+        raise tornado.gen.Return(result)
 
     def _setup_db_record(self):
         assert self.inputs is not None
