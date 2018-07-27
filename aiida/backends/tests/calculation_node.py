@@ -97,14 +97,27 @@ class TestCalcNode(AiidaTestCase):
 
 
 class TestCalcNodeLock(AiidaTestCase):
-    """
-    Test that locking a calculation node works correctly
-    """
+    """Test that locking a calculation node works correctly."""
 
     def test_try_relock(self):
+        """Trying to obtain a lock on a Calculation when it is already locked should raise a LockError."""
         calc = Calculation()
         calc.store()
+
         with calc.lock():
             with self.assertRaises(LockError):
                 with calc.lock():
                     pass
+
+    def test_lock_cleanup(self):
+        """After a lock is released, the public attribute should be reset to False."""
+        calc = Calculation()
+        calc.store()
+
+        with calc.lock():
+            # During the lock, the public attribute should be set to True
+            self.assertTrue(calc.is_locked)
+            pass
+
+        # Verify that the public attribute was properly reset
+        self.assertFalse(calc.is_locked)
