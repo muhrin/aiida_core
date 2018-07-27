@@ -11,21 +11,27 @@ import contextlib
 
 from aiida.orm.implementation.general.calculation import AbstractCalculation
 from aiida.orm.implementation.sqlalchemy.node import Node
-from aiida.common.exceptions import LockError
 
 
 class Calculation(AbstractCalculation, Node):
+
     @contextlib.contextmanager
     def lock(self):
+        """
+        Context manager that, while active, will lock the node
+
+        Trying to acquire this lock on an already locked node, will raise a LockError
+
+        :raises LockError: the node is already locked in another context manager
+        """
         from aiida.backends.sqlalchemy.models.node import DbNode
         from aiida.backends.sqlalchemy import get_scoped_session
-        from sqlalchemy.exc import OperationalError
+        from aiida.common.exceptions import LockError
 
         # No need to lock if it's an unstored node
-        already_locked = False
         if not self.is_stored:
             if self._dbnode.public:
-                already_locked = True
+                raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
             else:
                 self._dbnode.public = True
         else:
@@ -35,15 +41,21 @@ class Calculation(AbstractCalculation, Node):
                 update({'public': True})
 
             if res == 0:
-                already_locked = True
+                raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
 
-        if already_locked:
-            raise LockError("Can't lock <{}>, already locked.".format(self.pk))
-
-        try:
-            yield
-        finally:
-            self._dbnode.public = False
+            try:
+                yield
+            finally:
+                self._dbnode.public = False
+                self._dbnode.save()
+                self._dbnode.session.commit()
 
     def force_unlock(self):
+        """
+        Force the unlocking of a node, by resetting the lock attribute
+
+        This should only be used if one is absolutely clear that the node is no longer legitimately locked
+        due to an active `lock` context manager, but rather the lock was not properly cleaned in exiting
+        a previous lock context manager
+        """
         self._dbnode.public = False

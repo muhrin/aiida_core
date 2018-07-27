@@ -504,9 +504,9 @@ class Node(AbstractNode):
     @property
     def dbnode(self):
         # I also update the internal _dbnode variable, if it was saved
-        # from aiida.backends.djsite.db.models import DbNode
-        #        if self.is_stored:
-        #            self._dbnode = DbNode.objects.get(pk=self._dbnode.pk)
+        from aiida.backends.djsite.db.models import DbNode
+        if self.is_stored:
+            self._dbnode = DbNode.objects.get(pk=self._dbnode.pk)
         return self._dbnode
 
     def _db_store_all(self, with_transaction=True, use_cache=None):

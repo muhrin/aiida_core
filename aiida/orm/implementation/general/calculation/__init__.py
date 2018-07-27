@@ -469,8 +469,33 @@ class AbstractCalculation(Sealable):
         else:
             return None
 
+    @property
+    def is_locked(self):
+        """
+        Returns whether the node is currently locked
+        """
+        return self.dbnode.public
+
     @abc.abstractmethod
     def lock(self):
+        """
+        Context manager that, while active, will lock the node
+
+        Trying to acquire this lock on an already locked node, will raise a LockError
+
+        :raises LockError: the node is already locked in another context manager
+        """
+        pass
+
+    @abc.abstractmethod
+    def force_unlock(self):
+        """
+        Force the unlocking of a node, by resetting the lock attribute
+
+        This should only be used if one is absolutely clear that the node is no longer legitimately locked
+        due to an active `lock` context manager, but rather the lock was not properly cleaned in exiting
+        a previous lock context manager
+        """
         pass
 
     def get_linkname(self, link, *args, **kwargs):
