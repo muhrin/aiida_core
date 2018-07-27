@@ -28,8 +28,9 @@ class Calculation(AbstractCalculation, Node):
         from aiida.backends.sqlalchemy import get_scoped_session
         from aiida.common.exceptions import LockError
 
-        # No need to lock if it's an unstored node
         if not self.is_stored:
+            # Do a local, 'in-memory' lock, means that behaviour of entering this context twice is same
+            # as if it were stored
             if self._dbnode.public:
                 raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
             else:

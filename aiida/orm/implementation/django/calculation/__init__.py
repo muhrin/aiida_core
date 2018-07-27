@@ -9,11 +9,13 @@
 ###########################################################################
 import contextlib
 
+from aiida.common.exceptions import LockError
 from aiida.orm.implementation.django.node import Node
 from aiida.orm.implementation.general.calculation import AbstractCalculation
 
 
 class Calculation(AbstractCalculation, Node):
+    _locked = False
 
     @contextlib.contextmanager
     def lock(self):
@@ -24,34 +26,41 @@ class Calculation(AbstractCalculation, Node):
 
         :raises LockError: the node is already locked in another context manager
         """
-        from django.db import transaction, IntegrityError
+        from django.db import IntegrityError, OperationalError
         from aiida.backends.djsite.db.models import DbNode
         from aiida.common.exceptions import LockError
 
-        # No need to lock if it's an unstored node
+        # Have to employ different methods for stored and unstored nodes
         if not self.is_stored:
             if self._dbnode.public:
-                raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
-            else:
+                raise LockError('Cannot lock calculation<{}> as it is already locked.'.format(self.pk))
+            try:
                 self._dbnode.public = True
+                yield
+            finally:
+                self._dbnode.public = False
         else:
-            with transaction.atomic():
+            # Have to go database on this m'a f'cker
+            try:
                 try:
-                    # First try to select the calculation for update, which if it is already in a transaction
-                    # in another process, will raise an IntegrityError
-                    DbNode.objects.select_for_update(nowait=True).filter(pk=self.pk).first()
+                    DbNode.objects.update_or_create(pk=self.pk, public=False, defaults={'public': True})
+                    # Set the local dbnode instance lock value (this is invalidated by the above call)
+                    self._dbnode.public = True
+                    yield
+                finally:
+                    self.force_unlock()
 
-                    try:
-                        # The first check won't catch cases where the node was already locked in the
-                        # same interpreter, so for that case we try an update or create, which should
-                        # fail if it was already locked in the same process
-                        DbNode.objects.update_or_create(pk=self.pk, public=False, defaults={'public': True})
-                        yield
-                    finally:
-                        self._dbnode.public = False
-                        self._dbnode.save(update_fields=('public',))
-                except IntegrityError:
-                    raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
+            except IntegrityError:
+                # This means that the lock was activated and the above call tried to create a new row
+                # with the same pk as this node.  This fails the uniqueness constraint and ends up here.
+                raise LockError('cannot lock calculation<{}> as it is already locked.'.format(self.pk))
+
+    @property
+    def is_locked(self):
+        """
+        Returns whether the node is currently locked
+        """
+        return self.dbnode.public
 
     def force_unlock(self):
         """
@@ -62,3 +71,4 @@ class Calculation(AbstractCalculation, Node):
         a previous lock context manager
         """
         self._dbnode.public = False
+        self._dbnode.save(update_fields=('public',))

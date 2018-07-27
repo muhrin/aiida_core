@@ -7,7 +7,7 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-
+from aiida.orm import load_node
 from aiida.backends.testbase import AiidaTestCase
 from aiida.common.exceptions import ModificationNotAllowed, LockError
 from aiida.orm.calculation import Calculation
@@ -117,7 +117,24 @@ class TestCalcNodeLock(AiidaTestCase):
         with calc.lock():
             # During the lock, the public attribute should be set to True
             self.assertTrue(calc.is_locked)
-            pass
 
         # Verify that the public attribute was properly reset
         self.assertFalse(calc.is_locked)
+
+        # Try locking again
+        with calc.lock():
+            # During the lock, the public attribute should be set to True
+            self.assertTrue(calc.is_locked)
+        self.assertFalse(calc.is_locked)
+
+    def test_lock_different_instance(self):
+        """ Test that locking different python instance of the same node fails """
+        calc = Calculation()
+        calc.store()
+        # Load the same calc into another instance
+        calc2 = load_node(calc.pk)
+
+        with calc.lock():
+            with self.assertRaises(LockError):
+                with calc2.lock():
+                    pass
