@@ -18,8 +18,9 @@ import os
 
 from aiida.common.exceptions import ConfigurationError, MissingConfigurationError
 
-from aiida.common.setup import (get_config, get_secret_key, get_profile_config, parse_repository_uri)
 from aiida.backends import settings
+from aiida.common.setup import (get_secret_key, parse_repository_uri)
+from aiida.manage import load_config
 from aiida.utils.timezone import get_current_timezone
 
 # Assumes that parent directory of aiida is root for
@@ -30,7 +31,7 @@ BASE_DIR = os.path.split(AIIDA_DIR)[0]
 sys.path = [BASE_DIR] + sys.path
 
 try:
-    CONFS = get_config()
+    CONFIG = load_config()
 except MissingConfigurationError:
     raise MissingConfigurationError("Please run the AiiDA Installation, no config found")
 
@@ -38,7 +39,8 @@ if settings.AIIDADB_PROFILE is None:
     raise ConfigurationError("settings.AIIDADB_PROFILE not defined, did you load django"
                              "through the AiiDA load_dbenv()?")
 
-PROFILE_CONF = get_profile_config(settings.AIIDADB_PROFILE, conf_dict=CONFS)
+PROFILE = CONFIG.current_profile
+PROFILE_CONF = PROFILE.dictionary
 
 DATABASES = {
     'default': {

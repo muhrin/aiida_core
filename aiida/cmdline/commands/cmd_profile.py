@@ -7,19 +7,20 @@
 # For further information on the license, see the LICENSE.txt file        #
 # For further information please visit http://www.aiida.net               #
 ###########################################################################
-"""
-This allows to manage profiles from command line.
-"""
+"""`verdi profile` command."""
 from __future__ import division
 from __future__ import print_function
 from __future__ import absolute_import
+
 import click
+import tabulate
 
 from aiida.cmdline.commands.cmd_verdi import verdi
-from aiida.cmdline.utils import echo
+from aiida.cmdline.utils import defaults, echo
 from aiida.cmdline.params import arguments, options
+from aiida.common import exceptions
 from aiida.control.postgres import Postgres
-from aiida.common.profile import get_default_profile_name
+from aiida.manage import load_config
 
 
 @verdi.group('profile')
@@ -31,56 +32,40 @@ def verdi_profile():
 @verdi_profile.command('list')
 def profile_list():
     """Displays list of all available profiles."""
-    from aiida.common.setup import get_config, get_profiles_list, AIIDA_CONFIG_FOLDER
-    from aiida.common.exceptions import ConfigurationError
-    from aiida.common.exceptions import MissingConfigurationError
-
-    echo.echo_info('configuration folder: {}'.format(AIIDA_CONFIG_FOLDER))
-
     try:
-        get_config()
-    except MissingConfigurationError:
-        echo.echo_info("no configuration file found, run 'verdi quicksetup' first")
-        return
+        config = load_config()
+    except (exceptions.MissingConfigurationError, exceptions.ConfigurationError) as exception:
+        echo.echo_critical(str(exception))
 
-    try:
-        default_profile = get_default_profile_name()
-    except ConfigurationError as exception:
-        echo.echo_critical('could not load the configuration file: {}'.format(exception))
+    echo.echo_info('configuration folder: {}'.format(config.dirpath))
 
-    if default_profile is None:
-        echo.echo_critical('no default profile configured yet, run `verdi setup`')
-    else:
-        echo.echo_info('default profile is highlighted and marked by the * symbol')
+    default_profile = config.default_profile_name
 
-    for profile in sorted(get_profiles_list()):
-        if profile == default_profile:
-            color = 'green'
-            symbol = '*'
+    for profile in sorted(config.profiles, key=lambda p: p.name):
+        if profile.name == default_profile:
+            click.secho('{} {}'.format('*', profile.name), fg='green')
         else:
-            color = ''
-            symbol = ' '
-
-        click.secho('{} {}'.format(symbol, profile), fg=color)
+            click.secho('{} {}'.format(' ', profile.name))
 
 
 @verdi_profile.command('show')
-@arguments.PROFILE(default=get_default_profile_name())
+@arguments.PROFILE(required=False, callback=defaults.get_default_profile)
 def profile_show(profile):
     """Show details for PROFILE or, when not specified, the default profile."""
-    import tabulate
-
-    headers = ('Attribute', 'Value')
-    data = sorted([(k.lower(), v) for k, v in profile.config.items()])
-    echo.echo(tabulate.tabulate(data, headers=headers))
+    data = sorted([(k.lower(), v) for k, v in profile.dictionary.items()])
+    echo.echo(tabulate.tabulate(data, headers=('Attribute', 'Value')))
 
 
 @verdi_profile.command('setdefault')
 @arguments.PROFILE()
 def profile_setdefault(profile):
     """Set PROFILE as the default profile."""
-    from aiida.common.setup import set_default_profile
-    set_default_profile(profile.name, force_rewrite=True)
+    try:
+        config = load_config()
+    except (exceptions.MissingConfigurationError, exceptions.ConfigurationError) as exception:
+        echo.echo_critical(str(exception))
+
+    config.set_default_profile(profile.name, overwrite=True)
     echo.echo_success('{} set as default profile'.format(profile.name))
 
 
@@ -92,16 +77,19 @@ def profile_delete(force, profiles):
     Delete PROFILES separated by space from aiida config file
     along with its associated database and repository.
     """
-    from aiida.common.setup import get_or_create_config, update_config
-    import os.path
+    import os
     from six.moves.urllib.parse import urlparse  # pylint: disable=import-error
+
+    try:
+        config = load_config()
+    except (exceptions.MissingConfigurationError, exceptions.ConfigurationError) as exception:
+        echo.echo_critical(str(exception))
 
     profile_names = [profile.name for profile in profiles]
 
     echo.echo('profiles: {}'.format(', '.join(profile_names)))
 
-    confs = get_or_create_config()
-    available_profiles = confs.get('profiles', {})
+    available_profiles = config.profiles
     users = [available_profiles[name].get('AIIDADB_USER', '') for name in available_profiles.keys()]
 
     for profile_name in profile_names:
@@ -154,5 +142,4 @@ def profile_delete(force, profiles):
                 "Delete configuration for profile '{}'?\n"
                 "WARNING: Permanently removes profile from the list of AiiDA profiles.".format(profile_name)):
             echo.echo_info("Deleting configuration for profile '{}'.".format(profile_name))
-            del available_profiles[profile_name]
-            update_config(confs)
+            config.remove_profile(profile_name)
