@@ -3,7 +3,7 @@ PyCifRW==4.4.1; python_version >= '3'
 aiida-export-migration-tests==0.7.0
 aldjemy==0.9.1
 alembic==1.2.1
-ase==3.17.0
+ase==3.18.1
 circus==0.15.0
 click-completion==0.5.1
 click-config-file==0.5.0
